@@ -592,29 +592,33 @@ function loadLocal() {
 async function gsLoad() {
   setStatus('warn','Cargando desde Google Sheets...');
   try {
-    const res = await fetch(GAS_URL);
+    const res = await fetch(GAS_URL + '?t=' + Date.now(), {
+      method: 'GET',
+      redirect: 'follow'
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
     const rows = await res.json();
-    // fila 0 es encabezado, ignorar
     const data = rows.slice(1).map(r => ({
-      id:        r[0]||'',
-      type:      r[1]||'',
-      client:    r[2]||'',
-      date:      r[3]||'',
+      id:        String(r[0]||''),
+      type:      String(r[1]||''),
+      client:    String(r[2]||''),
+      date:      String(r[3]||''),
       value:     parseFloat(r[4])||0,
-      notes:     r[5]||'',
-      company:   r[6]||'',
-      instype:   r[7]||'',
-      status:    r[8]||'',
-      debitDate: r[9]||''
-    })).filter(s=>s.id);
+      notes:     String(r[5]||''),
+      company:   String(r[6]||''),
+      instype:   String(r[7]||''),
+      status:    String(r[8]||''),
+      debitDate: String(r[9]||'')
+    })).filter(s=>s.id && s.id !== 'id');
     sales = data;
     saveLocal();
     gsReady = true;
     setStatus('ok','Sincronizado · ' + new Date().toLocaleTimeString('es-CO'));
     buildMonthSelector();
     renderAll();
-    toast('✓ Datos cargados desde Google Sheets');
+    toast('✓ Datos sincronizados desde Google Sheets');
   } catch(e) {
+    console.error('gsLoad error:', e);
     setStatus('warn','Sin conexión — usando datos locales');
     toast('Sin conexión a Google Sheets','err');
   }
@@ -623,17 +627,25 @@ async function gsLoad() {
 // ── APPS SCRIPT: GUARDAR ──
 async function gsSave() {
   saveLocal();
-  const header = [['id','type','client','date','value','notes','company','instype','status','debitDate']];
-  const rows = sales.map(s=>[s.id,s.type,s.client,s.date,s.value||0,s.notes||'',s.company||'',s.instype||'',s.status||'',s.debitDate||'']);
-  const body = [...header, ...rows];
   setStatus('warn','Guardando...');
+  const header = [['id','type','client','date','value','notes','company','instype','status','debitDate']];
+  const rows = sales.map(s=>[
+    String(s.id), String(s.type), String(s.client), String(s.date),
+    s.value||0, String(s.notes||''), String(s.company||''),
+    String(s.instype||''), String(s.status||''), String(s.debitDate||'')
+  ]);
+  const body = [...header, ...rows];
   try {
-    await fetch(GAS_URL, {
+    const res = await fetch(GAS_URL, {
       method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(body)
     });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
     setStatus('ok','Guardado en Google Sheets · ' + new Date().toLocaleTimeString('es-CO'));
   } catch(e) {
+    console.error('gsSave error:', e);
     setStatus('warn','Guardado solo local (sin conexión)');
   }
 }
