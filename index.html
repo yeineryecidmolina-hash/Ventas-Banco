@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento Mensual de Productos — Banco</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f7f4fc;
+    --bg3: #ede8f5;
+    --text: #1e1b2e;
+    --text2: #6b6280;
+    --text3: #a89fc0;
+    --border: rgba(120,90,200,0.12);
+    --border2: rgba(120,90,200,0.22);
+    --radius: 10px;
+    --radius-lg: 16px;
+
+    /* Brand colors - pastel palette */
+    --blue: #5b6dcd;
+    --blue-dark: #3d4fa8;
+    --blue-light: #e8ecff;
+    --blue-text: #2e3a8c;
+
+    --green: #3d9e72;
+    --green-light: #d4f2e6;
+    --green-dark: #1e6e4c;
+
+    --red: #c0435a;
+    --red-light: #fce8ed;
+
+    --amber-light: #fff4d4;
+    --amber-dark: #8a5a00;
+
+    /* Sura - naranja suave */
+    --sura-bg: #fff0e8;
+    --sura-accent: #e85d20;
+    --sura-text: #8a3210;
+    --sura-badge: #fdd5bf;
+
+    /* Cardiff - rosa suave */
+    --cardiff-bg: #fce8f4;
+    --cardiff-accent: #c02870;
+    --cardiff-text: #7a1048;
+    --cardiff-badge: #f8c8e8;
+
+    --purple-light: #ede8ff;
+    --purple-mid: #b8a8f0;
+    --purple-dark: #4a3aaa;
+    --purple-accent: #7c6be0;
+
+    --topbar-h: 64px;
+    --shadow-sm: 0 2px 8px rgba(90,60,180,0.08);
+    --shadow-md: 0 4px 20px rgba(90,60,180,0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1726;
+      --bg2: #241f36;
+      --bg3: #181525;
+      --text: #f0ecff;
+      --text2: #9e96c0;
+      --text3: #6b628a;
+      --border: rgba(160,130,255,0.12);
+      --border2: rgba(160,130,255,0.22);
+      --blue: #8090e8;
+      --blue-dark: #a8b4f8;
+      --blue-light: #1e2450;
+      --blue-text: #c0ccff;
+      --green: #52be8a;
+      --green-light: #0e3020;
+      --green-dark: #90e0b8;
+      --red: #f07090;
+      --red-light: #401020;
+      --amber-light: #38280a;
+      --amber-dark: #ffd080;
+      --sura-bg: #3a1a08;
+      --sura-accent: #ff8a50;
+      --sura-text: #ffb890;
+      --sura-badge: #5a2810;
+      --cardiff-bg: #3a0820;
+      --cardiff-accent: #f060a0;
+      --cardiff-text: #f8a0c8;
+      --cardiff-badge: #580830;
+      --purple-light: #1e1a40;
+      --purple-mid: #605090;
+      --purple-dark: #c0b0ff;
+      --purple-accent: #9080e0;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    background: linear-gradient(135deg, #1a1060 0%, #3d2a9e 40%, #7c3abf 75%, #b5459a 100%);
+    border-bottom: none;
+    padding: 0 32px;
+    height: 70px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 6px 32px rgba(60,30,150,0.35);
+  }
+  /* decorative shimmer line at bottom of topbar */
+  .topbar::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), #e0aaff, rgba(255,255,255,0.5), transparent);
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 14px; }
+  .topbar-logo {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #fff;
+    border: 1.5px solid rgba(255,255,255,0.35);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  .topbar-title {
+    font-size: 17px; font-weight: 700; color: #fff;
+    letter-spacing: -.3px;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.2);
+  }
+  .topbar-sub { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 1px; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .month-pick { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,0.85); }
+  .month-pick label { font-weight: 500; }
+  .month-pick select {
+    font-size: 13px; padding: 7px 14px;
+    border: 1.5px solid rgba(255,255,255,0.5);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.95);
+    color: #2e1a7a;
+    cursor: pointer;
+    font-weight: 700;
+    letter-spacing: .01em;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    min-width: 110px;
+    text-align: center;
+  }
+  .month-pick select:hover { background: #fff; }
+  .month-pick select option { background: #fff; color: #1e1b2e; font-weight: 600; }
+  .status-pill {
+    display: flex; align-items: center; gap: 6px; font-size: 11px;
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.12);
+    padding: 6px 14px; border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.25);
+    font-weight: 500;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #7fffa0; flex-shrink: 0; animation: pulse 2s infinite; }
+  .dot.warn { background: #ffd070; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* ── LAYOUT ── */
+  .main { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+  .tab {
+    padding: 9px 18px; border: 1.5px solid var(--border2); border-radius: 50px;
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    background: var(--bg); color: var(--text2);
+    transition: all .2s; display: flex; align-items: center; gap: 7px;
+    box-shadow: var(--shadow-sm);
+  }
+  .tab.active {
+    background: var(--purple-accent); color: #fff;
+    border-color: var(--purple-accent);
+    box-shadow: 0 4px 14px rgba(124,107,224,0.35);
+  }
+  .tab:hover:not(.active) { background: var(--purple-light); border-color: var(--purple-mid); color: var(--purple-dark); }
+  .panel { display: none; } .panel.active { display: block; }
+
+  /* ── METRICS ── */
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric {
+    background: var(--bg); border-radius: var(--radius-lg); padding: 16px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    position: relative; overflow: hidden;
+  }
+  .metric::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--purple-accent), var(--blue));
+  }
+  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; font-weight: 500; }
+  .metric-value { font-size: 30px; font-weight: 700; color: var(--purple-dark); letter-spacing: -1px; }
+  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+  .card-title i { color: var(--purple-accent); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media(max-width:600px){ .two-col { grid-template-columns: 1fr; } }
+
+  /* ── FORM ── */
+  .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .fg { display: flex; flex-direction: column; gap: 5px; }
+  .fg label { font-size: 12px; color: var(--text2); font-weight: 500; letter-spacing: .02em; }
+  .fg input, .fg select {
+    font-size: 14px; padding: 10px 12px;
+    border: 1.5px solid var(--border2); border-radius: var(--radius);
+    background: var(--bg2); color: var(--text); outline: none;
+    transition: all .15s; font-family: inherit;
+  }
+  .fg input:focus, .fg select:focus {
+    border-color: var(--purple-accent);
+    background: var(--bg);
+    box-shadow: 0 0 0 3px rgba(124,107,224,.15);
+  }
+
+  /* ── BUTTONS ── */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .btn {
+    padding: 10px 18px; border: 1.5px solid var(--border2); border-radius: var(--radius);
+    cursor: pointer; font-size: 14px; font-weight: 500;
+    background: var(--bg); color: var(--text);
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: all .15s; font-family: inherit;
+  }
+  .btn:hover { background: var(--purple-light); border-color: var(--purple-mid); }
+  .btn-primary { background: var(--purple-accent); color: #fff; border-color: var(--purple-accent); box-shadow: 0 3px 12px rgba(124,107,224,.4); }
+  .btn-primary:hover { background: var(--purple-dark); border-color: var(--purple-dark); }
+  .btn-success { background: var(--green); color: #fff; border-color: var(--green); }
+  .btn-success:hover { background: var(--green-dark); }
+  .btn-danger { border-color: var(--red); color: var(--red); }
+  .btn-danger:hover { background: var(--red-light); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  /* ── DEBIT BUTTON — big & clear ── */
+  .check-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 2px solid var(--border2);
+    background: var(--bg2); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all .2s; color: var(--text3);
+  }
+  .check-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-light); transform: scale(1.1); }
+  .check-btn.done { background: var(--green-light); border-color: var(--green); color: var(--green-dark); box-shadow: 0 2px 8px rgba(61,158,114,.3); }
+  .check-btn.done:hover { background: var(--red-light); border-color: var(--red); color: var(--red); }
+
+  /* debit toggle in table - wider label */
+  .debit-cell { min-width: 90px; }
+  .debit-toggle {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 20px;
+    border: 2px solid var(--border2); cursor: pointer;
+    font-size: 11px; font-weight: 600;
+    background: var(--bg2); color: var(--text2);
+    transition: all .2s; white-space: nowrap;
+  }
+  .debit-toggle:hover { border-color: var(--green); color: var(--green); background: var(--green-light); }
+  .debit-toggle.done { background: var(--green-light); border-color: var(--green); color: var(--green-dark); }
+  .debit-toggle.done:hover { background: var(--red-light); border-color: var(--red); color: var(--red); }
+
+  /* ── FILTERS ── */
+  .export-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: flex-end; }
+  .filter-row select, .filter-row input {
+    font-size: 13px; padding: 8px 12px;
+    border: 1.5px solid var(--border2); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-family: inherit;
+  }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; border-bottom: 1.5px solid var(--border); color: var(--text2); font-weight: 600; white-space: nowrap; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg2); }
+
+  /* ── BADGES ── */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .b-pending { background: var(--amber-light); color: var(--amber-dark); }
+  .b-debited { background: var(--green-light); color: var(--green-dark); }
+  .b-cdt { background: var(--blue-light); color: var(--blue-text); }
+  .b-card { background: var(--purple-light); color: var(--purple-dark); }
+  .b-sura { background: var(--sura-badge); color: var(--sura-text); }
+  .b-cardiff { background: var(--cardiff-badge); color: var(--cardiff-text); }
+
+  /* ── ASEGURADORAS HEADERS ── */
+  .company-header-sura {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    background: var(--sura-bg); border-radius: var(--radius);
+    border-left: 4px solid var(--sura-accent); margin-bottom: 12px;
+  }
+  .company-header-cardiff {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    background: var(--cardiff-bg); border-radius: var(--radius);
+    border-left: 4px solid var(--cardiff-accent); margin-bottom: 12px;
+  }
+  .company-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; flex-shrink: 0;
+  }
+  .company-icon-sura { background: var(--sura-accent); color: #fff; }
+  .company-icon-cardiff { background: var(--cardiff-accent); color: #fff; }
+
+  /* ── PROGRESS ── */
+  .progress-bar { height: 8px; border-radius: 4px; background: var(--bg2); overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+
+  /* ── MISC ── */
+  .empty { text-align: center; padding: 2.5rem; color: var(--text3); font-size: 13px; }
+  .section-div { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; margin: 22px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .chart-wrap { height: 220px; position: relative; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 13px 20px; font-size: 13px; box-shadow: var(--shadow-md); z-index: 999; display: flex; align-items: center; gap: 8px; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast-ok { border-left: 4px solid var(--green); }
+  .toast-err { border-left: 4px solid var(--red); }
+
+  /* ── COMPANY LOGOS (SVG inline) ── */
+  .logo-sura { color: var(--sura-accent); font-size: 14px; font-weight: 800; font-style: italic; letter-spacing: -.5px; }
+  .logo-cardiff { color: var(--cardiff-accent); font-size: 13px; font-weight: 800; letter-spacing: .5px; }
+
+  /* ── REGISTRATION CARD ── */
+  .form-card-sura { border-top: 3px solid var(--sura-accent); }
+  .form-card-cardiff { border-top: 3px solid var(--cardiff-accent); }
+
+  /* cedula input */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+  /* insurance type select highlighted */
+  #fg-instype.sura select { border-color: var(--sura-accent); background: var(--sura-bg); }
+  #fg-instype.cardiff select { border-color: var(--cardiff-accent); background: var(--cardiff-bg); }
+
+  .btn-gs {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.15); color: #fff;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all .2s; font-family: inherit;
+    backdrop-filter: blur(8px);
+  }
+  .btn-gs:hover { background: rgba(255,255,255,0.28); }
+  .btn-gs-out { background: rgba(255,80,80,0.25); border-color: rgba(255,150,150,0.4); }
+  .btn-gs-out:hover { background: rgba(255,80,80,0.4); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo">
+      <i class="ti ti-building-bank"></i>
+    </div>
+    <div>
+      <div class="topbar-title">Seguimiento Mensual de Productos</div>
+      <div class="topbar-sub" id="current-date"></div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="month-pick">
+      <i class="ti ti-calendar"></i>
+      <label for="global-month">Mes:</label>
+      <select id="global-month" onchange="changeMonth()"></select>
+    </div>
+    <button class="btn-gs" onclick="gsLoad()">
+      <svg width="14" height="14" viewBox="0 0 48 48"><path fill="#fff" d="M44.5 20H24v8.5h11.7C34.3 33.6 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.1 3l6-6C34.7 5.2 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.8 0 20-7.8 20-21 0-1.4-.1-2.7-.5-4z"/></svg>
+      Sincronizar
+    </button>
+    <div class="status-pill">
+      <div class="dot warn" id="status-dot"></div>
+      <span id="status-text">Iniciando...</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('resumen',this)"><i class="ti ti-layout-dashboard"></i> Resumen</div>
+    <div class="tab" onclick="showTab('registrar',this)"><i class="ti ti-plus"></i> Registrar venta</div>
+    <div class="tab" onclick="showTab('seguros',this)"><i class="ti ti-shield"></i> Seguros</div>
+    <div class="tab" onclick="showTab('otros',this)"><i class="ti ti-credit-card"></i> CDT &amp; Tarjetas</div>
+  </div>
+
+  <!-- ══ RESUMEN ══ -->
+  <div class="panel active" id="panel-resumen">
+    <div class="export-row">
+      <button class="btn btn-success btn-sm" onclick="exportExcel('mes')"><i class="ti ti-file-spreadsheet"></i> Exportar mes a Excel</button>
+      <button class="btn btn-sm" onclick="exportExcel('todo')"><i class="ti ti-database-export"></i> Exportar historial completo</button>
+    </div>
+    <div class="grid-4" id="metrics-grid"></div>
+    <div class="two-col">
+      <div class="card"><div class="card-title"><i class="ti ti-shield"></i> Por aseguradora</div><div id="by-company"></div></div>
+      <div class="card"><div class="card-title"><i class="ti ti-award"></i> Histórico total</div><div id="goals-panel"></div></div>
+    </div>
+    <div class="card"><div class="card-title"><i class="ti ti-clock"></i> Últimas ventas</div><div id="recent-sales"></div></div>
+    <div class="card"><div class="card-title"><i class="ti ti-chart-bar"></i> Ventas por producto (mes)</div><div class="chart-wrap"><canvas id="chart-main" role="img" aria-label="Gráfica ventas por producto"></canvas></div></div>
+  </div>
+
+  <!-- ══ REGISTRAR ══ -->
+  <div class="panel" id="panel-registrar">
+    <div class="card" id="form-main-card">
+      <div class="card-title"><i class="ti ti-plus"></i> Nueva venta</div>
+
+      <!-- Selector de producto y aseguradora -->
+      <div class="form-row">
+        <div class="fg">
+          <label>Tipo de producto</label>
+          <select id="f-type" onchange="toggleFields()">
+            <option value="seguro">Seguro</option>
+            <option value="cdt">CDT</option>
+            <option value="tarjeta">Tarjeta de crédito</option>
+          </select>
+        </div>
+        <div class="fg" id="fg-company">
+          <label>Aseguradora</label>
+          <select id="f-company" onchange="updateInsuranceTypes()">
+            <option value="Sura">Sura</option>
+            <option value="Cardiff">Cardiff</option>
+          </select>
+        </div>
+        <div class="fg" id="fg-instype">
+          <label>Tipo de seguro</label>
+          <select id="f-instype"></select>
+        </div>
+      </div>
+
+      <!-- Datos del cliente -->
+      <div class="form-row">
+        <div class="fg">
+          <label>Cédula del cliente</label>
+          <input type="text" id="f-client" placeholder="Ej: 1000123456" inputmode="numeric" maxlength="15">
+        </div>
+        <div class="fg">
+          <label>Fecha de venta</label>
+          <input type="date" id="f-date">
+        </div>
+        <div class="fg">
+          <label>Valor / Prima ($)</label>
+          <input type="number" id="f-value" placeholder="0" min="0">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="fg" style="grid-column:1/-1">
+          <label>Notas</label>
+          <input type="text" id="f-notes" placeholder="Observaciones opcionales">
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addSale()"><i class="ti ti-check"></i> Guardar venta</button>
+        <button class="btn" onclick="clearForm()"><i class="ti ti-x"></i> Limpiar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SEGUROS ══ -->
+  <div class="panel" id="panel-seguros">
+    <div class="export-row">
+      <button class="btn btn-success btn-sm" onclick="exportExcel('seguros')"><i class="ti ti-file-spreadsheet"></i> Exportar seguros a Excel</button>
+    </div>
+    <div class="filter-row">
+      <select id="f-filter-company" onchange="renderSeguros()">
+        <option value="">Todas las aseguradoras</option>
+        <option value="Sura">Sura</option>
+        <option value="Cardiff">Cardiff</option>
+      </select>
+      <select id="f-filter-status" onchange="renderSeguros()">
+        <option value="">Todos los estados</option>
+        <option value="pending">Pendiente débito</option>
+        <option value="debited">Debitado</option>
+      </select>
+      <select id="f-filter-instype" onchange="renderSeguros()">
+        <option value="">Todos los tipos</option>
+        <optgroup label="Sura">
+          <option>Salud para ti</option>
+          <option>Protege tu vida</option>
+          <option>Salud más</option>
+          <option>Mascota protegida</option>
+          <option>Vida renta</option>
+          <option>Capital en vida</option>
+        </optgroup>
+        <optgroup label="Cardiff">
+          <option>Protección a cuentas</option>
+          <option>Megacombo</option>
+        </optgroup>
+      </select>
+      <input type="text" id="f-search" placeholder="🔍 Buscar por cédula..." style="flex:1;min-width:150px" oninput="renderSeguros()">
+      <button class="btn btn-sm" onclick="resetFilters()"><i class="ti ti-refresh"></i> Limpiar</button>
+    </div>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cédula</th>
+              <th>Aseguradora</th>
+              <th>Tipo de seguro</th>
+              <th>Prima</th>
+              <th>Fecha venta</th>
+              <th>Fecha débito</th>
+              <th>Estado</th>
+              <th>Marcar debitado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tabla-seguros"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CDT & TARJETAS ══ -->
+  <div class="panel" id="panel-otros">
+    <div class="export-row">
+      <button class="btn btn-success btn-sm" onclick="exportExcel('otros')"><i class="ti ti-file-spreadsheet"></i> Exportar CDT &amp; Tarjetas a Excel</button>
+    </div>
+    <div class="section-div"><i class="ti ti-building-bank"></i> CDT</div>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cédula</th><th>Valor</th><th>Fecha venta</th><th>Notas</th><th></th></tr></thead>
+          <tbody id="tabla-cdt"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="section-div"><i class="ti ti-credit-card"></i> Tarjetas de crédito</div>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cédula</th><th>Fecha venta</th><th>Notas</th><th></th></tr></thead>
+          <tbody id="tabla-tarjetas"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let sales = [];
+let currentMonth = '';
+let chartInstance = null;
+let activeTab = 'resumen';
+const STORAGE_KEY = 'ventas_banco_v3';
+
+// ── GOOGLE APPS SCRIPT CONFIG ──
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxXFWStU8QYiAc9HwIyQS6CPKJROVf_yuaq0yOCkrRRV6852WySk-i9oxYifba4qO4/exec';
+let gsReady = false;
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const INSURANCE_TYPES = {
+  Sura: ['Salud para ti','Protege tu vida','Salud más','Mascota protegida','Vida renta','Capital en vida'],
+  Cardiff: ['Protección a cuentas','Megacombo']
+};
+
+// ── STORAGE ──
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.className = 'toast toast-' + type;
+  el.innerHTML = `<i class="ti ti-${type==='ok'?'check':'alert-circle'}"></i> ${msg}`;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+function setStatus(state, text) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'dot' + (state !== 'ok' ? ' warn' : '');
+  txt.textContent = text;
+}
+// ── LOCAL BACKUP ──
+function saveLocal() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sales)); } catch(e) {}
+}
+function loadLocal() {
+  try { const d = localStorage.getItem(STORAGE_KEY); if(d) { sales = JSON.parse(d); } } catch(e) {}
+}
+
+// ── APPS SCRIPT: CARGAR ──
+async function gsLoad() {
+  setStatus('warn','Cargando desde Google Sheets...');
+  try {
+    const res = await fetch(GAS_URL);
+    const rows = await res.json();
+    // fila 0 es encabezado, ignorar
+    const data = rows.slice(1).map(r => ({
+      id:        r[0]||'',
+      type:      r[1]||'',
+      client:    r[2]||'',
+      date:      r[3]||'',
+      value:     parseFloat(r[4])||0,
+      notes:     r[5]||'',
+      company:   r[6]||'',
+      instype:   r[7]||'',
+      status:    r[8]||'',
+      debitDate: r[9]||''
+    })).filter(s=>s.id);
+    sales = data;
+    saveLocal();
+    gsReady = true;
+    setStatus('ok','Sincronizado · ' + new Date().toLocaleTimeString('es-CO'));
+    buildMonthSelector();
+    renderAll();
+    toast('✓ Datos cargados desde Google Sheets');
+  } catch(e) {
+    setStatus('warn','Sin conexión — usando datos locales');
+    toast('Sin conexión a Google Sheets','err');
+  }
+}
+
+// ── APPS SCRIPT: GUARDAR ──
+async function gsSave() {
+  saveLocal();
+  const header = [['id','type','client','date','value','notes','company','instype','status','debitDate']];
+  const rows = sales.map(s=>[s.id,s.type,s.client,s.date,s.value||0,s.notes||'',s.company||'',s.instype||'',s.status||'',s.debitDate||'']);
+  const body = [...header, ...rows];
+  setStatus('warn','Guardando...');
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    setStatus('ok','Guardado en Google Sheets · ' + new Date().toLocaleTimeString('es-CO'));
+  } catch(e) {
+    setStatus('warn','Guardado solo local (sin conexión)');
+  }
+}
+
+function save() { gsSave(); }
+function load() { loadLocal(); }
+
+// ── DATE / MONTH HELPERS ──
+function getMonthKey(d) { if(!d) return ''; const x = new Date(d+'T12:00:00'); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'); }
+function getMonthLabel(k) { if(!k) return ''; const[y,m]=k.split('-'); return MONTHS_ES[parseInt(m)-1]; }
+function getMonths() {
+  const keys = new Set(sales.map(s=>getMonthKey(s.date)));
+  const now=new Date(); keys.add(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
+  return [...keys].sort().reverse();
+}
+function buildMonthSelector() {
+  const sel = document.getElementById("global-month");
+  const now = new Date();
+  const year = now.getFullYear();
+  const allMonths = new Set();
+  for(let i = 1; i <= 12; i++) allMonths.add(year + "-" + String(i).padStart(2,"0"));
+  sales.forEach(s => { if(s.date) allMonths.add(getMonthKey(s.date)); });
+  const sorted = [...allMonths].sort().reverse();
+  sel.innerHTML = sorted.map(m=>`<option value="${m}"${m===currentMonth?" selected":""}>${getMonthLabel(m)}</option>`).join("");
+}
+function changeMonth() { currentMonth=document.getElementById('global-month').value; renderAll(); }
+function getSalesForMonth() { return sales.filter(s=>getMonthKey(s.date)===currentMonth); }
+
+// ── TABS ──
+function showTab(id, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  el.classList.add('active');
+  activeTab = id;
+  if(id==='resumen') renderResumen();
+  if(id==='seguros') renderSeguros();
+  if(id==='otros') renderOtros();
+}
+
+// ── FORM LOGIC ──
+function updateInsuranceTypes() {
+  const company = document.getElementById('f-company').value;
+  const sel = document.getElementById('f-instype');
+  const fgInstype = document.getElementById('fg-instype');
+  const types = INSURANCE_TYPES[company] || [];
+  sel.innerHTML = types.map(t=>`<option value="${t}">${t}</option>`).join('');
+  // Visual hint by company
+  fgInstype.className = 'fg ' + (company === 'Sura' ? 'sura' : 'cardiff');
+}
+
+function toggleFields() {
+  const t = document.getElementById('f-type').value;
+  const show = t === 'seguro';
+  document.getElementById('fg-company').style.display = show ? '' : 'none';
+  document.getElementById('fg-instype').style.display = show ? '' : 'none';
+  if(show) updateInsuranceTypes();
+}
+
+function addSale() {
+  const client = document.getElementById('f-client').value.trim();
+  const date = document.getElementById('f-date').value;
+  if(!client||!date){ alert('Por favor ingresa la cédula del cliente y la fecha.'); return; }
+  const t = document.getElementById('f-type').value;
+  const sale = {
+    id: Date.now()+'_'+Math.random().toString(36).substr(2,5),
+    type: t, client, date,
+    value: parseFloat(document.getElementById('f-value').value)||0,
+    notes: document.getElementById('f-notes').value.trim(),
+    company: t==='seguro' ? document.getElementById('f-company').value : '',
+    instype: t==='seguro' ? document.getElementById('f-instype').value : '',
+    status: t==='seguro' ? 'pending' : '',
+    debitDate: ''
+  };
+  sales.unshift(sale);
+  save();
+  currentMonth = getMonthKey(date);
+  buildMonthSelector();
+  document.getElementById('global-month').value = currentMonth;
+  renderAll();
+  clearForm();
+  toast('Venta registrada correctamente');
+}
+
+function clearForm() {
+  ['f-client','f-value','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-type').value='seguro';
+  document.getElementById('f-company').value='Sura';
+  toggleFields();
+}
+
+function deleteSale(id) {
+  if(!confirm('¿Eliminar esta venta?')) return;
+  sales = sales.filter(s=>s.id!==id);
+  save(); renderAll();
+  toast('Venta eliminada');
+}
+
+function toggleDebit(id) {
+  const s = sales.find(x=>x.id===id);
+  if(!s) return;
+  if(s.status==='pending'){ s.status='debited'; s.debitDate=new Date().toISOString().split('T')[0]; }
+  else { s.status='pending'; s.debitDate=''; }
+  save(); renderAll();
+  toast(s.status==='debited'?'✓ Marcado como debitado':'Marcado como pendiente');
+}
+
+// ── FORMAT ──
+function fmtDate(d) { if(!d) return '—'; const[y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+function fmtCOP(v) { if(!v) return '—'; return '$'+Math.round(v).toLocaleString('es-CO'); }
+
+function badge(type, company) {
+  if(type==='seguro'){
+    const isSura = company==='Sura';
+    const icon = isSura ? '🔶' : '💗';
+    return `<span class="badge ${isSura?'b-sura':'b-cardiff'}">${icon} ${company}</span>`;
+  }
+  if(type==='cdt') return `<span class="badge b-cdt"><i class="ti ti-building-bank"></i> CDT</span>`;
+  return `<span class="badge b-card"><i class="ti ti-credit-card"></i> T. Crédito</span>`;
+}
+
+function statusBadge(s) {
+  if(s.type!=='seguro') return '';
+  return s.status==='debited'
+    ? `<span class="badge b-debited"><i class="ti ti-check"></i> Debitado</span>`
+    : `<span class="badge b-pending"><i class="ti ti-clock"></i> Pendiente</span>`;
+}
+
+// ── RENDER RESUMEN ──
+function renderResumen() {
+  const month = getSalesForMonth();
+  const seguros = month.filter(s=>s.type==='seguro');
+  const debited = seguros.filter(s=>s.status==='debited');
+  const cdts = month.filter(s=>s.type==='cdt');
+  const cards = month.filter(s=>s.type==='tarjeta');
+  const totalVal = seguros.reduce((a,s)=>a+(s.value||0),0);
+  const pct = seguros.length ? Math.round(debited.length/seguros.length*100) : 0;
+
+  document.getElementById('metrics-grid').innerHTML = `
+    <div class="metric">
+      <div class="metric-label"><i class="ti ti-shield"></i> Seguros vendidos</div>
+      <div class="metric-value">${seguros.length}</div>
+      <div class="metric-sub">${getMonthLabel(currentMonth)}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label"><i class="ti ti-check"></i> Seguros debitados</div>
+      <div class="metric-value">${debited.length}</div>
+      <div class="metric-sub">${pct}% del total</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label"><i class="ti ti-building-bank"></i> CDT colocados</div>
+      <div class="metric-value">${cdts.length}</div>
+      <div class="metric-sub">${getMonthLabel(currentMonth)}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label"><i class="ti ti-credit-card"></i> Tarjetas vendidas</div>
+      <div class="metric-value">${cards.length}</div>
+      <div class="metric-sub">${getMonthLabel(currentMonth)}</div>
+    </div>
+  `;
+
+  const sura = seguros.filter(s=>s.company==='Sura');
+  const cardiff = seguros.filter(s=>s.company==='Cardiff');
+  const suraPct = seguros.length ? Math.round(sura.length/seguros.length*100) : 0;
+  const cardiffPct = seguros.length ? Math.round(cardiff.length/seguros.length*100) : 0;
+
+  document.getElementById('by-company').innerHTML = `
+    <div style="margin-bottom:16px">
+      <div class="company-header-sura">
+        <div class="company-icon company-icon-sura">S</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:var(--sura-text);margin-bottom:2px">Sura</div>
+          <div style="font-size:12px;color:var(--text2)">${sura.length} vendidos &nbsp;·&nbsp; ${sura.filter(x=>x.status==='debited').length} debitados</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${suraPct}%;background:var(--sura-accent)"></div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="company-header-cardiff">
+        <div class="company-icon company-icon-cardiff">C</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:var(--cardiff-text);margin-bottom:2px">Cardiff</div>
+          <div style="font-size:12px;color:var(--text2)">${cardiff.length} vendidos &nbsp;·&nbsp; ${cardiff.filter(x=>x.status==='debited').length} debitados</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${cardiffPct}%;background:var(--cardiff-accent)"></div></div>
+        </div>
+      </div>
+    </div>
+    ${totalVal>0?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:var(--radius);font-size:13px;color:var(--text2)">Prima total del mes: <b style="color:var(--text)">${fmtCOP(totalVal)}</b></div>`:''}
+  `;
+
+  const allS = sales.filter(s=>s.type==='seguro');
+  const allDeb = allS.filter(s=>s.status==='debited');
+  document.getElementById('goals-panel').innerHTML = `
+    <div style="font-size:13px;color:var(--text2);margin-bottom:4px">Seguros totales vendidos</div>
+    <div style="font-size:32px;font-weight:700;color:var(--purple-dark)">${allS.length}</div>
+    <div style="font-size:13px;color:var(--text2);margin-top:4px">${allDeb.length} debitados en total</div>
+    <div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:var(--radius);font-size:13px;color:var(--text2)">
+      CDT: <b>${sales.filter(s=>s.type==='cdt').length}</b> &nbsp;·&nbsp; Tarjetas: <b>${sales.filter(s=>s.type==='tarjeta').length}</b>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text3)">Meses con actividad: ${getMonths().filter(m=>sales.some(s=>getMonthKey(s.date)===m)).length}</div>
+  `;
+
+  const recent = sales.slice(0,6);
+  document.getElementById('recent-sales').innerHTML = recent.length
+    ? `<div class="table-wrap"><table>
+        <thead><tr><th>Cédula</th><th>Producto</th><th>Fecha</th><th>Estado</th></tr></thead>
+        <tbody>${recent.map(s=>`<tr>
+          <td style="font-weight:600">${s.client}</td>
+          <td>${badge(s.type,s.company)}${s.instype?` <span style="font-size:11px;color:var(--text2)">${s.instype}</span>`:''}</td>
+          <td>${fmtDate(s.date)}</td>
+          <td>${statusBadge(s)}</td>
+        </tr>`).join('')}</tbody>
+       </table></div>`
+    : '<div class="empty"><i class="ti ti-mood-empty" style="font-size:32px;opacity:.4"></i><br>No hay ventas registradas aún</div>';
+  renderChart(month);
+}
+
+function renderChart(month) {
+  const ctx = document.getElementById('chart-main').getContext('2d');
+  if(chartInstance){chartInstance.destroy();chartInstance=null;}
+  chartInstance = new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:['Sura','Cardiff','CDT','T. Crédito'],
+      datasets:[{
+        label:'Unidades',
+        data:[
+          month.filter(s=>s.type==='seguro'&&s.company==='Sura').length,
+          month.filter(s=>s.type==='seguro'&&s.company==='Cardiff').length,
+          month.filter(s=>s.type==='cdt').length,
+          month.filter(s=>s.type==='tarjeta').length
+        ],
+        backgroundColor:['#ffb89a','#f4a8cc','#a8c4f8','#c8bef8'],
+        borderColor:['#e85d20','#c02870','#5b6dcd','#7c6be0'],
+        borderWidth:2,
+        borderRadius:8
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true,ticks:{stepSize:1,color:'#888'},grid:{color:'rgba(128,128,128,.08)'}},
+        x:{ticks:{color:'#888'},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function resetFilters() {
+  ['f-filter-company','f-filter-status','f-filter-instype'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-search').value='';
+  renderSeguros();
+}
+
+function renderSeguros() {
+  const company = document.getElementById('f-filter-company').value;
+  const status = document.getElementById('f-filter-status').value;
+  const instype = document.getElementById('f-filter-instype').value;
+  const search = document.getElementById('f-search').value.toLowerCase();
+  let data = getSalesForMonth().filter(s=>s.type==='seguro');
+  if(company) data=data.filter(s=>s.company===company);
+  if(status) data=data.filter(s=>s.status===status);
+  if(instype) data=data.filter(s=>s.instype===instype);
+  if(search) data=data.filter(s=>s.client.toLowerCase().includes(search));
+
+  const tb = document.getElementById('tabla-seguros');
+  tb.innerHTML = data.length ? data.map(s=>`<tr>
+    <td style="font-weight:600">${s.client}</td>
+    <td>${badge(s.type,s.company)}</td>
+    <td><span style="font-size:12px;font-weight:500">${s.instype}</span></td>
+    <td style="font-size:12px;font-weight:600">${fmtCOP(s.value)}</td>
+    <td style="font-size:12px">${fmtDate(s.date)}</td>
+    <td style="font-size:12px;color:var(--text2)">${fmtDate(s.debitDate)}</td>
+    <td>${statusBadge(s)}</td>
+    <td class="debit-cell">
+      <button class="debit-toggle ${s.status==='debited'?'done':''}" onclick="toggleDebit('${s.id}')" title="${s.status==='debited'?'Clic para marcar pendiente':'Clic para marcar debitado'}">
+        <i class="ti ti-${s.status==='debited'?'check':'circle'}"></i>
+        ${s.status==='debited'?'Debitado':'Débito'}
+      </button>
+    </td>
+    <td><button class="btn btn-sm btn-danger" onclick="deleteSale('${s.id}')"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('')
+  : `<tr><td colspan="9"><div class="empty"><i class="ti ti-shield-off" style="font-size:28px;opacity:.3"></i><br>No hay seguros para mostrar</div></td></tr>`;
+}
+
+function renderOtros() {
+  const month = getSalesForMonth();
+  const cdts = month.filter(s=>s.type==='cdt');
+  const cards = month.filter(s=>s.type==='tarjeta');
+  document.getElementById('tabla-cdt').innerHTML = cdts.length
+    ? cdts.map(s=>`<tr>
+        <td style="font-weight:600">${s.client}</td>
+        <td style="font-weight:600">${fmtCOP(s.value)}</td>
+        <td>${fmtDate(s.date)}</td>
+        <td style="font-size:12px;color:var(--text2)">${s.notes||'—'}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteSale('${s.id}')"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')
+    : `<tr><td colspan="5"><div class="empty">No hay CDT en este mes</div></td></tr>`;
+  document.getElementById('tabla-tarjetas').innerHTML = cards.length
+    ? cards.map(s=>`<tr>
+        <td style="font-weight:600">${s.client}</td>
+        <td>${fmtDate(s.date)}</td>
+        <td style="font-size:12px;color:var(--text2)">${s.notes||'—'}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteSale('${s.id}')"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')
+    : `<tr><td colspan="4"><div class="empty">No hay tarjetas en este mes</div></td></tr>`;
+}
+
+function renderAll() { buildMonthSelector(); renderResumen(); if(activeTab==='seguros') renderSeguros(); if(activeTab==='otros') renderOtros(); }
+
+function exportExcel(scope) {
+  let data = []; let filename = '';
+  const now = new Date();
+  if(scope==='mes'){data=getSalesForMonth();filename=`ventas_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
+  else if(scope==='todo'){data=[...sales];filename=`ventas_historico_${now.toISOString().slice(0,10)}.xlsx`;}
+  else if(scope==='seguros'){data=getSalesForMonth().filter(s=>s.type==='seguro');filename=`seguros_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
+  else if(scope==='otros'){data=getSalesForMonth().filter(s=>s.type!=='seguro');filename=`cdt_tarjetas_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
+  if(!data.length){alert('No hay datos para exportar.');return;}
+  const wb = XLSX.utils.book_new();
+  const seg = data.filter(s=>s.type==='seguro');
+  if(seg.length){
+    const ws=XLSX.utils.json_to_sheet(seg.map(s=>({'Cédula cliente':s.client,'Aseguradora':s.company,'Tipo de seguro':s.instype,'Prima mensual':s.value||0,'Fecha de venta':fmtDate(s.date),'Fecha débito':fmtDate(s.debitDate),'Estado':s.status==='debited'?'Debitado':'Pendiente débito','Notas':s.notes||''})));
+    ws['!cols']=[{wch:18},{wch:12},{wch:22},{wch:14},{wch:14},{wch:14},{wch:18},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,ws,'Seguros');
+  }
+  const cdts = data.filter(s=>s.type==='cdt');
+  if(cdts.length){
+    const ws=XLSX.utils.json_to_sheet(cdts.map(s=>({'Cédula cliente':s.client,'Valor CDT':s.value||0,'Fecha de venta':fmtDate(s.date),'Notas':s.notes||''})));
+    ws['!cols']=[{wch:18},{wch:15},{wch:14},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,ws,'CDT');
+  }
+  const cards = data.filter(s=>s.type==='tarjeta');
+  if(cards.length){
+    const ws=XLSX.utils.json_to_sheet(cards.map(s=>({'Cédula cliente':s.client,'Fecha de venta':fmtDate(s.date),'Notas':s.notes||''})));
+    ws['!cols']=[{wch:18},{wch:14},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,ws,'Tarjetas');
+  }
+  const mes = getSalesForMonth(); const sg=mes.filter(s=>s.type==='seguro');
+  const resumen=[
+    {'Métrica':'Mes analizado','Valor':getMonthLabel(currentMonth)},
+    {'Métrica':'Seguros vendidos','Valor':sg.length},
+    {'Métrica':'Seguros Sura','Valor':sg.filter(s=>s.company==='Sura').length},
+    {'Métrica':'Seguros Cardiff','Valor':sg.filter(s=>s.company==='Cardiff').length},
+    {'Métrica':'Debitados','Valor':sg.filter(s=>s.status==='debited').length},
+    {'Métrica':'Pendientes','Valor':sg.filter(s=>s.status==='pending').length},
+    {'Métrica':'% debitados','Valor':sg.length?Math.round(sg.filter(s=>s.status==='debited').length/sg.length*100)+'%':'0%'},
+    {'Métrica':'Prima total','Valor':sg.reduce((a,s)=>a+(s.value||0),0)},
+    {'Métrica':'CDT colocados','Valor':mes.filter(s=>s.type==='cdt').length},
+    {'Métrica':'Tarjetas vendidas','Valor':mes.filter(s=>s.type==='tarjeta').length},
+    {'Métrica':'Fecha exportación','Valor':now.toLocaleString('es-CO')}
+  ];
+  const wsR=XLSX.utils.json_to_sheet(resumen); wsR['!cols']=[{wch:28},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
+  XLSX.writeFile(wb,filename);
+  toast('Archivo Excel descargado');
+}
+
+function init() {
+  const now = new Date();
+  currentMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('f-date').value = now.toISOString().split('T')[0];
+  document.getElementById('current-date').textContent = now.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  toggleFields();
+  load(); // carga local primero
+  buildMonthSelector();
+  renderAll();
+  gsLoad(); // luego sincroniza con Google Sheets automáticamente
+}
+init();
+</script>
+</body>
+</html>
