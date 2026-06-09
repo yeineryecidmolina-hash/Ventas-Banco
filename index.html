@@ -332,6 +332,8 @@
   .form-card-sura { border-top: 3px solid var(--sura-accent); }
   .form-card-cardiff { border-top: 3px solid var(--cardiff-accent); }
 
+  tfoot td { padding: 10px 12px; font-size: 13px; border-top: 2px solid var(--border2); }
+
   /* cedula input */
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -390,6 +392,8 @@
     <div class="tab" onclick="showTab('registrar',this)"><i class="ti ti-plus"></i> Registrar venta</div>
     <div class="tab" onclick="showTab('seguros',this)"><i class="ti ti-shield"></i> Seguros</div>
     <div class="tab" onclick="showTab('otros',this)"><i class="ti ti-credit-card"></i> CDT &amp; Tarjetas</div>
+    <div class="tab" onclick="showTab('fiducias',this)"><i class="ti ti-building-estate"></i> Fiducias</div>
+    <div class="tab" onclick="showTab('historico',this)"><i class="ti ti-history"></i> Histórico</div>
   </div>
 
   <!-- ══ RESUMEN ══ -->
@@ -397,13 +401,14 @@
     <div class="export-row">
       <button class="btn btn-success btn-sm" onclick="exportExcel('mes')"><i class="ti ti-file-spreadsheet"></i> Exportar mes a Excel</button>
       <button class="btn btn-sm" onclick="exportExcel('todo')"><i class="ti ti-database-export"></i> Exportar historial completo</button>
+      <button class="btn btn-sm" onclick="diagnostico()" title="Ver qué datos llegaron de Google Sheets"><i class="ti ti-bug"></i> Diagnóstico</button>
     </div>
     <div class="grid-4" id="metrics-grid"></div>
     <div class="two-col">
       <div class="card"><div class="card-title"><i class="ti ti-shield"></i> Por aseguradora</div><div id="by-company"></div></div>
       <div class="card"><div class="card-title"><i class="ti ti-award"></i> Histórico total</div><div id="goals-panel"></div></div>
     </div>
-    <div class="card"><div class="card-title"><i class="ti ti-clock"></i> Últimas ventas</div><div id="recent-sales"></div></div>
+    <div class="card"><div class="card-title"><i class="ti ti-clock"></i> Ventas del mes</div><div id="recent-sales"></div></div>
     <div class="card"><div class="card-title"><i class="ti ti-chart-bar"></i> Ventas por producto (mes)</div><div class="chart-wrap"><canvas id="chart-main" role="img" aria-label="Gráfica ventas por producto"></canvas></div></div>
   </div>
 
@@ -420,6 +425,7 @@
             <option value="seguro">Seguro</option>
             <option value="cdt">CDT</option>
             <option value="tarjeta">Tarjeta de crédito</option>
+            <option value="fiducia">Fiducia</option>
           </select>
         </div>
         <div class="fg" id="fg-company">
@@ -545,6 +551,52 @@
       </div>
     </div>
   </div>
+
+  <!-- ══ FIDUCIAS ══ -->
+  <div class="panel" id="panel-fiducias">
+    <div class="export-row">
+      <button class="btn btn-success btn-sm" onclick="exportExcel('fiducias')"><i class="ti ti-file-spreadsheet"></i> Exportar fiducias a Excel</button>
+    </div>
+    <div class="section-div"><i class="ti ti-building-estate"></i> Fiducias</div>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cédula</th><th>Valor</th><th>Fecha venta</th><th>Notas</th><th></th></tr></thead>
+          <tbody id="tabla-fiducias"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ HISTÓRICO ══ -->
+  <div class="panel" id="panel-historico">
+    <div class="export-row">
+      <button class="btn btn-success btn-sm" onclick="exportExcel('todo')"><i class="ti ti-database-export"></i> Exportar historial completo</button>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-award"></i> Totales acumulados</div>
+      <div id="hist-totales"></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:16px 20px 8px"><div class="card-title" style="margin-bottom:0"><i class="ti ti-calendar-stats"></i> Resumen por mes</div></div>
+      <div class="table-wrap" style="padding:0 12px 12px">
+        <table>
+          <thead>
+            <tr>
+              <th>Mes</th><th>Seguros</th><th>Sura</th><th>Cardiff</th><th>Debitados</th><th>% Déb.</th><th>Prima total</th><th>CDT</th><th>Tarjetas</th><th>Fiducias</th><th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-historico-body"></tbody>
+          <tfoot id="tabla-historico-foot"></tfoot>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-chart-bar"></i> Evolución mensual</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="chart-historico"></canvas></div>
+    </div>
+  </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -553,6 +605,7 @@
 let sales = [];
 let currentMonth = '';
 let chartInstance = null;
+let chartHistoricoInstance = null;
 let activeTab = 'resumen';
 const STORAGE_KEY = 'ventas_banco_v3';
 
@@ -602,21 +655,22 @@ async function gsLoad() {
       id:        String(r[0]||''),
       type:      String(r[1]||''),
       client:    String(r[2]||''),
-      date:      String(r[3]||''),
+      date:      normalizeDate(r[3]),
       value:     parseFloat(r[4])||0,
       notes:     String(r[5]||''),
       company:   String(r[6]||''),
       instype:   String(r[7]||''),
       status:    String(r[8]||''),
-      debitDate: String(r[9]||'')
-    })).filter(s=>s.id && s.id !== 'id');
+      debitDate: normalizeDate(r[9])
+    })).filter(s=>s.id && s.id !== 'id' && s.date);
     sales = data;
     saveLocal();
     gsReady = true;
+    const sample = data.slice(0,3).map(s=>`${s.client} ${s.date}`).join(', ');
     setStatus('ok','Sincronizado · ' + new Date().toLocaleTimeString('es-CO'));
     buildMonthSelector();
     renderAll();
-    toast('✓ Datos sincronizados desde Google Sheets');
+    toast(`✓ ${data.length} registros cargados`);
   } catch(e) {
     console.error('gsLoad error:', e);
     setStatus('warn','Sin conexión — usando datos locales');
@@ -654,8 +708,37 @@ function save() { gsSave(); }
 function load() { loadLocal(); }
 
 // ── DATE / MONTH HELPERS ──
-function getMonthKey(d) { if(!d) return ''; const x = new Date(d+'T12:00:00'); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'); }
-function getMonthLabel(k) { if(!k) return ''; const[y,m]=k.split('-'); return MONTHS_ES[parseInt(m)-1]; }
+// Normaliza cualquier formato de fecha a YYYY-MM-DD
+function normalizeDate(d) {
+  if(!d || d==='undefined' || d==='null') return '';
+  d = String(d).trim();
+  // Ya está en formato correcto YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  // Formato DD/MM/YYYY
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d)) {
+    const [dd,mm,yyyy] = d.split('/');
+    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  // Formato MM/DD/YYYY
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d)) {
+    const [mm,dd,yyyy] = d.split('/');
+    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  // Número serial de Excel (días desde 1900-01-01)
+  if(/^\d+(\.\d+)?$/.test(d)) {
+    const serial = parseFloat(d);
+    if(serial > 40000 && serial < 60000) {
+      const date = new Date((serial - 25569) * 86400 * 1000);
+      return date.toISOString().split('T')[0];
+    }
+  }
+  // Intentar parsear como fecha genérica
+  const parsed = new Date(d);
+  if(!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+  return '';
+}
+function getMonthKey(d) { const nd = normalizeDate(d); if(!nd) return ''; const x = new Date(nd+'T12:00:00'); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'); }
+function getMonthLabel(k) { if(!k) return ''; const[y,m]=k.split('-'); return MONTHS_ES[parseInt(m)-1]+' '+y; }
 function getMonths() {
   const keys = new Set(sales.map(s=>getMonthKey(s.date)));
   const now=new Date(); keys.add(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
@@ -684,6 +767,8 @@ function showTab(id, el) {
   if(id==='resumen') renderResumen();
   if(id==='seguros') renderSeguros();
   if(id==='otros') renderOtros();
+  if(id==='fiducias') renderFiducias();
+  if(id==='historico') renderHistorico();
 }
 
 // ── FORM LOGIC ──
@@ -765,6 +850,7 @@ function badge(type, company) {
     return `<span class="badge ${isSura?'b-sura':'b-cardiff'}">${icon} ${company}</span>`;
   }
   if(type==='cdt') return `<span class="badge b-cdt"><i class="ti ti-building-bank"></i> CDT</span>`;
+  if(type==='fiducia') return `<span class="badge b-cdt" style="background:var(--blue-light);color:#1a4a7a"><i class="ti ti-building-estate"></i> Fiducia</span>`;
   return `<span class="badge b-card"><i class="ti ti-credit-card"></i> T. Crédito</span>`;
 }
 
@@ -782,6 +868,7 @@ function renderResumen() {
   const debited = seguros.filter(s=>s.status==='debited');
   const cdts = month.filter(s=>s.type==='cdt');
   const cards = month.filter(s=>s.type==='tarjeta');
+  const fiducias = month.filter(s=>s.type==='fiducia');
   const totalVal = seguros.reduce((a,s)=>a+(s.value||0),0);
   const pct = seguros.length ? Math.round(debited.length/seguros.length*100) : 0;
 
@@ -804,6 +891,11 @@ function renderResumen() {
     <div class="metric">
       <div class="metric-label"><i class="ti ti-credit-card"></i> Tarjetas vendidas</div>
       <div class="metric-value">${cards.length}</div>
+      <div class="metric-sub">${getMonthLabel(currentMonth)}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label"><i class="ti ti-building-estate"></i> Fiducias</div>
+      <div class="metric-value">${fiducias.length}</div>
       <div class="metric-sub">${getMonthLabel(currentMonth)}</div>
     </div>
   `;
@@ -849,15 +941,16 @@ function renderResumen() {
     <div style="margin-top:8px;font-size:12px;color:var(--text3)">Meses con actividad: ${getMonths().filter(m=>sales.some(s=>getMonthKey(s.date)===m)).length}</div>
   `;
 
-  const recent = sales.slice(0,6);
+  const recent = month.slice(0,10);
   document.getElementById('recent-sales').innerHTML = recent.length
     ? `<div class="table-wrap"><table>
-        <thead><tr><th>Cédula</th><th>Producto</th><th>Fecha</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Cédula</th><th>Producto</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
         <tbody>${recent.map(s=>`<tr>
           <td style="font-weight:600">${s.client}</td>
           <td>${badge(s.type,s.company)}${s.instype?` <span style="font-size:11px;color:var(--text2)">${s.instype}</span>`:''}</td>
           <td>${fmtDate(s.date)}</td>
           <td>${statusBadge(s)}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="deleteSale('${s.id}')"><i class="ti ti-trash"></i></button></td>
         </tr>`).join('')}</tbody>
        </table></div>`
     : '<div class="empty"><i class="ti ti-mood-empty" style="font-size:32px;opacity:.4"></i><br>No hay ventas registradas aún</div>';
@@ -870,17 +963,18 @@ function renderChart(month) {
   chartInstance = new Chart(ctx,{
     type:'bar',
     data:{
-      labels:['Sura','Cardiff','CDT','T. Crédito'],
+      labels:['Sura','Cardiff','CDT','T. Crédito','Fiducias'],
       datasets:[{
         label:'Unidades',
         data:[
           month.filter(s=>s.type==='seguro'&&s.company==='Sura').length,
           month.filter(s=>s.type==='seguro'&&s.company==='Cardiff').length,
           month.filter(s=>s.type==='cdt').length,
-          month.filter(s=>s.type==='tarjeta').length
+          month.filter(s=>s.type==='tarjeta').length,
+          month.filter(s=>s.type==='fiducia').length
         ],
-        backgroundColor:['#ffb89a','#f4a8cc','#a8c4f8','#c8bef8'],
-        borderColor:['#e85d20','#c02870','#5b6dcd','#7c6be0'],
+        backgroundColor:['#ffb89a','#f4a8cc','#a8c4f8','#c8bef8','#a8d8c8'],
+        borderColor:['#e85d20','#c02870','#5b6dcd','#7c6be0','#2a7a5a'],
         borderWidth:2,
         borderRadius:8
       }]
@@ -956,7 +1050,147 @@ function renderOtros() {
     : `<tr><td colspan="4"><div class="empty">No hay tarjetas en este mes</div></td></tr>`;
 }
 
-function renderAll() { buildMonthSelector(); renderResumen(); if(activeTab==='seguros') renderSeguros(); if(activeTab==='otros') renderOtros(); }
+function renderFiducias() {
+  const month = getSalesForMonth();
+  const fiducias = month.filter(s=>s.type==='fiducia');
+  document.getElementById('tabla-fiducias').innerHTML = fiducias.length
+    ? fiducias.map(s=>`<tr>
+        <td style="font-weight:600">${s.client}</td>
+        <td style="font-weight:600">${fmtCOP(s.value)}</td>
+        <td>${fmtDate(s.date)}</td>
+        <td style="font-size:12px;color:var(--text2)">${s.notes||'—'}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteSale('${s.id}')"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')
+    : `<tr><td colspan="5"><div class="empty">No hay fiducias en este mes</div></td></tr>`;
+}
+
+function renderAll() { buildMonthSelector(); renderResumen(); if(activeTab==='seguros') renderSeguros(); if(activeTab==='otros') renderOtros(); if(activeTab==='fiducias') renderFiducias(); if(activeTab==='historico') renderHistorico(); }
+
+function renderHistorico() {
+  const months = getMonths().filter(m => sales.some(s => getMonthKey(s.date) === m)).sort();
+  
+  // Totales acumulados
+  const allSeg = sales.filter(s=>s.type==='seguro');
+  const allDeb = allSeg.filter(s=>s.status==='debited');
+  const allCdt = sales.filter(s=>s.type==='cdt');
+  const allCard = sales.filter(s=>s.type==='tarjeta');
+  const allFid = sales.filter(s=>s.type==='fiducia');
+  const allPrima = allSeg.reduce((a,s)=>a+(s.value||0),0);
+  const debPct = allSeg.length ? Math.round(allDeb.length/allSeg.length*100) : 0;
+
+  document.getElementById('hist-totales').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:4px">
+      <div style="text-align:center;padding:14px;background:var(--bg2);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px"><i class="ti ti-shield"></i> Seguros</div>
+        <div style="font-size:26px;font-weight:700;color:var(--purple-dark)">${allSeg.length}</div>
+        <div style="font-size:11px;color:var(--text3)">${allDeb.length} debitados (${debPct}%)</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--sura-bg);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--sura-text);margin-bottom:4px">🔶 Sura</div>
+        <div style="font-size:26px;font-weight:700;color:var(--sura-accent)">${allSeg.filter(s=>s.company==='Sura').length}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--cardiff-bg);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--cardiff-text);margin-bottom:4px">💗 Cardiff</div>
+        <div style="font-size:26px;font-weight:700;color:var(--cardiff-accent)">${allSeg.filter(s=>s.company==='Cardiff').length}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--blue-light);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--blue-text);margin-bottom:4px"><i class="ti ti-building-bank"></i> CDT</div>
+        <div style="font-size:26px;font-weight:700;color:var(--blue)">${allCdt.length}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--purple-light);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--purple-dark);margin-bottom:4px"><i class="ti ti-credit-card"></i> Tarjetas</div>
+        <div style="font-size:26px;font-weight:700;color:var(--purple-accent)">${allCard.length}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--green-light);border-radius:var(--radius)">
+        <div style="font-size:11px;color:var(--green-dark);margin-bottom:4px"><i class="ti ti-building-estate"></i> Fiducias</div>
+        <div style="font-size:26px;font-weight:700;color:var(--green)">${allFid.length}</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg2);border-radius:var(--radius);grid-column:span 2">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px"><i class="ti ti-cash"></i> Prima total acumulada</div>
+        <div style="font-size:22px;font-weight:700;color:var(--green-dark)">${fmtCOP(allPrima)}</div>
+        <div style="font-size:11px;color:var(--text3)">${months.length} ${months.length===1?'mes':'meses'} con actividad</div>
+      </div>
+    </div>
+  `;
+
+  // Tabla por mes
+  let totSeg=0,totSura=0,totCard=0,totDeb=0,totCdt=0,totTar=0,totFid=0,totPrima=0;
+  const rows = months.slice().reverse().map(m => {
+    const ms = sales.filter(s=>getMonthKey(s.date)===m);
+    const seg = ms.filter(s=>s.type==='seguro');
+    const sura = seg.filter(s=>s.company==='Sura').length;
+    const cardiff = seg.filter(s=>s.company==='Cardiff').length;
+    const deb = seg.filter(s=>s.status==='debited').length;
+    const prima = seg.reduce((a,s)=>a+(s.value||0),0);
+    const cdt = ms.filter(s=>s.type==='cdt').length;
+    const tar = ms.filter(s=>s.type==='tarjeta').length;
+    const fid = ms.filter(s=>s.type==='fiducia').length;
+    const pct = seg.length ? Math.round(deb/seg.length*100) : 0;
+    const total = ms.length;
+    totSeg+=seg.length; totSura+=sura; totCard+=cardiff; totDeb+=deb; totCdt+=cdt; totTar+=tar; totFid+=fid; totPrima+=prima;
+    const isCurrent = m===currentMonth;
+    return `<tr style="${isCurrent?'background:var(--purple-light);font-weight:600':''}">
+      <td><span style="font-weight:700;color:var(--purple-accent)">${getMonthLabel(m)}</span>${isCurrent?' <span style="font-size:10px;background:var(--purple-accent);color:#fff;padding:2px 7px;border-radius:10px;margin-left:4px">actual</span>':''}</td>
+      <td style="text-align:center">${seg.length}</td>
+      <td style="text-align:center"><span style="color:var(--sura-accent)">${sura}</span></td>
+      <td style="text-align:center"><span style="color:var(--cardiff-accent)">${cardiff}</span></td>
+      <td style="text-align:center"><span class="badge b-debited" style="font-size:11px">${deb}</span></td>
+      <td style="text-align:center">${seg.length?`<span style="font-size:12px;font-weight:600;color:${pct>=80?'var(--green)':pct>=50?'var(--amber-dark)':'var(--red)'}">${pct}%</span>`:'—'}</td>
+      <td>${prima>0?fmtCOP(prima):'—'}</td>
+      <td style="text-align:center">${cdt||'—'}</td>
+      <td style="text-align:center">${tar||'—'}</td>
+      <td style="text-align:center">${fid||'—'}</td>
+      <td style="text-align:center;font-weight:700">${total}</td>
+    </tr>`;
+  });
+
+  document.getElementById('tabla-historico-body').innerHTML = rows.length
+    ? rows.join('')
+    : '<tr><td colspan="11"><div class="empty">No hay datos históricos</div></td></tr>';
+
+  const totPct = totSeg ? Math.round(totDeb/totSeg*100) : 0;
+  document.getElementById('tabla-historico-foot').innerHTML = `
+    <tr style="background:var(--bg2);font-weight:700;border-top:2px solid var(--border)">
+      <td>TOTAL</td>
+      <td style="text-align:center">${totSeg}</td>
+      <td style="text-align:center;color:var(--sura-accent)">${totSura}</td>
+      <td style="text-align:center;color:var(--cardiff-accent)">${totCard}</td>
+      <td style="text-align:center">${totDeb}</td>
+      <td style="text-align:center">${totSeg?totPct+'%':'—'}</td>
+      <td>${fmtCOP(totPrima)}</td>
+      <td style="text-align:center">${totCdt}</td>
+      <td style="text-align:center">${totTar}</td>
+      <td style="text-align:center">${totFid}</td>
+      <td style="text-align:center">${totSeg+totCdt+totTar+totFid}</td>
+    </tr>
+  `;
+
+  // Gráfico evolución
+  const ctx2 = document.getElementById('chart-historico').getContext('2d');
+  if(chartHistoricoInstance){chartHistoricoInstance.destroy();chartHistoricoInstance=null;}
+  const labels = months.map(m=>getMonthLabel(m));
+  chartHistoricoInstance = new Chart(ctx2,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Sura', data: months.map(m=>sales.filter(s=>getMonthKey(s.date)===m&&s.type==='seguro'&&s.company==='Sura').length), backgroundColor:'#ffb89a', borderColor:'#e85d20', borderWidth:2, borderRadius:6, stack:'seg' },
+        { label:'Cardiff', data: months.map(m=>sales.filter(s=>getMonthKey(s.date)===m&&s.type==='seguro'&&s.company==='Cardiff').length), backgroundColor:'#f4a8cc', borderColor:'#c02870', borderWidth:2, borderRadius:6, stack:'seg' },
+        { label:'CDT', data: months.map(m=>sales.filter(s=>getMonthKey(s.date)===m&&s.type==='cdt').length), backgroundColor:'#a8c4f8', borderColor:'#5b6dcd', borderWidth:2, borderRadius:6, stack:'otros' },
+        { label:'Tarjetas', data: months.map(m=>sales.filter(s=>getMonthKey(s.date)===m&&s.type==='tarjeta').length), backgroundColor:'#c8bef8', borderColor:'#7c6be0', borderWidth:2, borderRadius:6, stack:'otros' },
+        { label:'Fiducias', data: months.map(m=>sales.filter(s=>getMonthKey(s.date)===m&&s.type==='fiducia').length), backgroundColor:'#a8d8c8', borderColor:'#2a7a5a', borderWidth:2, borderRadius:6, stack:'otros' },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true, position:'bottom', labels:{ font:{size:11}, padding:14 } } },
+      scales:{
+        y:{beginAtZero:true,ticks:{stepSize:1,color:'#888'},grid:{color:'rgba(128,128,128,.08)'}},
+        x:{ticks:{color:'#888'},grid:{display:false}}
+      }
+    }
+  });
+}
 
 function exportExcel(scope) {
   let data = []; let filename = '';
@@ -964,7 +1198,8 @@ function exportExcel(scope) {
   if(scope==='mes'){data=getSalesForMonth();filename=`ventas_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
   else if(scope==='todo'){data=[...sales];filename=`ventas_historico_${now.toISOString().slice(0,10)}.xlsx`;}
   else if(scope==='seguros'){data=getSalesForMonth().filter(s=>s.type==='seguro');filename=`seguros_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
-  else if(scope==='otros'){data=getSalesForMonth().filter(s=>s.type!=='seguro');filename=`cdt_tarjetas_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
+  else if(scope==='otros'){data=getSalesForMonth().filter(s=>s.type==='cdt'||s.type==='tarjeta');filename=`cdt_tarjetas_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
+  else if(scope==='fiducias'){data=getSalesForMonth().filter(s=>s.type==='fiducia');filename=`fiducias_${getMonthLabel(currentMonth).replace(' ','_')}.xlsx`;}
   if(!data.length){alert('No hay datos para exportar.');return;}
   const wb = XLSX.utils.book_new();
   const seg = data.filter(s=>s.type==='seguro');
@@ -985,6 +1220,12 @@ function exportExcel(scope) {
     ws['!cols']=[{wch:18},{wch:14},{wch:30}];
     XLSX.utils.book_append_sheet(wb,ws,'Tarjetas');
   }
+  const fiducias = data.filter(s=>s.type==='fiducia');
+  if(fiducias.length){
+    const ws=XLSX.utils.json_to_sheet(fiducias.map(s=>({'Cédula cliente':s.client,'Valor':s.value||0,'Fecha de venta':fmtDate(s.date),'Notas':s.notes||''})));
+    ws['!cols']=[{wch:18},{wch:15},{wch:14},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,ws,'Fiducias');
+  }
   const mes = getSalesForMonth(); const sg=mes.filter(s=>s.type==='seguro');
   const resumen=[
     {'Métrica':'Mes analizado','Valor':getMonthLabel(currentMonth)},
@@ -1003,6 +1244,14 @@ function exportExcel(scope) {
   XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
   XLSX.writeFile(wb,filename);
   toast('Archivo Excel descargado');
+}
+
+function diagnostico() {
+  if(!sales.length){ alert('No hay datos cargados. Intenta sincronizar primero.'); return; }
+  const sample = sales.slice(0,10);
+  const info = sample.map((s,i)=>`#${i+1} | tipo:${s.type} | cliente:${s.client} | fecha:"${s.date}" | mesKey:${getMonthKey(s.date)}`).join('\n');
+  const meses = [...new Set(sales.map(s=>getMonthKey(s.date)))].filter(Boolean).sort().join(', ');
+  alert(`Total registros: ${sales.length}\nMes actual: ${currentMonth}\nMeses encontrados: ${meses}\n\nPrimeros 10 registros:\n${info}`);
 }
 
 function init() {
